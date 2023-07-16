@@ -2,7 +2,7 @@ package router
 
 import (
 	"encoding/json"
-	"github.com/juzeon/poe-openai-proxy/conf"
+
 	"io"
 	"net/http"
 	"time"
@@ -31,7 +31,7 @@ func Setup(engine *gin.Engine) {
 			return
 		}
 		for _, msg := range req.Messages {
-			if msg.Role != "system" && msg.Role != "user" && msg.Role != "assistant" {
+			if msg.Role != "system" && msg.Role != "user" && msg.Role != "assistant" && msg.Role != "function" {
 				c.JSON(400, "role of message validation failed: "+msg.Role)
 				return
 			}

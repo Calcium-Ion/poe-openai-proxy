@@ -8,6 +8,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pelletier/go-toml/v2 v2.0.7
+	github.com/pkoukk/tiktoken-go v0.1.4
 )
 
 require (
@@ -26,7 +27,6 @@ require (
 	github.com/mattn/go-isatty v0.0.18 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/pkoukk/tiktoken-go v0.1.4 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	golang.org/x/arch v0.3.0 // indirect

@@ -53,6 +53,7 @@ func (c *Client) getContentToSend(messages []Message) string {
 		"system":    "Instructions",
 		"user":      "User",
 		"assistant": "Assistant",
+		"function":  "Information",
 	}
 	content := ""
 	var simulateRoles bool
