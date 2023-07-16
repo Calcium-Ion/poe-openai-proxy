@@ -2,12 +2,16 @@ package poe
 
 import (
 	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/go-resty/resty/v2"
 	"github.com/gorilla/websocket"
 	"github.com/juzeon/poe-openai-proxy/conf"
 	"github.com/juzeon/poe-openai-proxy/util"
-	"sync"
-	"time"
+	"github.com/pkoukk/tiktoken-go"
 )
 
 var httpClient *resty.Client
@@ -82,6 +86,21 @@ func (c *Client) getContentToSend(messages []Message) string {
 func (c *Client) Stream(messages []Message, model string) (<-chan string, error) {
 	channel := make(chan string, 1024)
 	content := c.getContentToSend(messages)
+
+	tkm, err := tiktoken.EncodingForModel(model)
+	if err != nil {
+		err = fmt.Errorf("getEncoding: %v", err)
+		return nil, err
+	}
+
+	token := tkm.Encode(content, nil, nil)
+
+	util.Logger.Info("Token len ", len(token))
+
+	if model == "gpt-4" && len(token) > 6000 {
+		return nil, errors.New("out of tokens limit")
+	}
+
 	conn, _, err := websocket.DefaultDialer.Dial(conf.Conf.GetGatewayWsURL()+"/stream", nil)
 	if err != nil {
 		return nil, err
@@ -110,6 +129,16 @@ func (c *Client) Stream(messages []Message, model string) (<-chan string, error)
 		defer conn.Close()
 		for {
 			_, v, err := conn.ReadMessage()
+			if strings.HasPrefix(string(v), "An exception of type") {
+				util.Logger.Error(string(v))
+				err = errors.New("connect to openai error code 2，有可能是你的上下文被openai屏蔽而拒绝回复")
+			}
+
+			if strings.Contains(string(v), "ERROR: websocket: RSV1 set, FIN") {
+				util.Logger.Error(string(v))
+				err = errors.New("connect to openai error code 3")
+			}
+
 			channel <- string(v)
 			if err != nil {
 				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
@@ -125,6 +154,20 @@ func (c *Client) Stream(messages []Message, model string) (<-chan string, error)
 }
 func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 	content := c.getContentToSend(messages)
+
+	tkm, err := tiktoken.EncodingForModel(model)
+	if err != nil {
+		err = fmt.Errorf("getEncoding: %v", err)
+		return nil, err
+	}
+
+	token := tkm.Encode(content, nil, nil)
+
+	util.Logger.Info("Token len ", len(token))
+
+	if model == "gpt-4" && len(token) > 6000 {
+		return nil, errors.New("out of tokens limit")
+	}
 
 	bot, ok := conf.Conf.Bot[model]
 	if !ok {

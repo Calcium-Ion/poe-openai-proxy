@@ -2,12 +2,14 @@ package router
 
 import (
 	"encoding/json"
+	"github.com/juzeon/poe-openai-proxy/conf"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/juzeon/poe-openai-proxy/conf"
+
+	"github.com/gin-gonic/gin"
 	"github.com/juzeon/poe-openai-proxy/poe"
 	"github.com/juzeon/poe-openai-proxy/util"
 )
@@ -35,6 +37,7 @@ func Setup(engine *gin.Engine) {
 			}
 		}
 		client, err := poe.GetClient()
+		defer client.Release()
 		if err != nil {
 			c.JSON(500, err)
 			return
