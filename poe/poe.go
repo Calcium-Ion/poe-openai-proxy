@@ -166,8 +166,9 @@ func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 
 	util.Logger.Info("Token len ", len(token))
 
-	if model == "gpt-4" && len(token) > 6000 {
-		return nil, errors.New("out of tokens limit")
+	if model == "gpt-4" && len(token) > 2200 {
+		model = "gpt-4-32k"
+		util.Logger.Info("Token len ", len(token), " out of limit, use gpt-4-32k")
 	}
 
 	bot, ok := conf.Conf.Bot[model]
