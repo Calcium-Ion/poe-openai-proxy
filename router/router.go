@@ -68,26 +68,34 @@ func Setup(engine *gin.Engine) {
 	engine.OPTIONS("/v1/chat/completions", optionsCompletions)
 }
 func Stream(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
 	defer func() {
 		if err := recover(); err != nil {
 			util.Logger.Error(err)
-			c.Error(fmt.Errorf("timeout, error code: 2"))
+			openAIError := poe.OpenAIError{
+				Type:    "openai_api_error",
+				Message: "The server had an error while processing your request",
+				Code:    "do_request_failed",
+			}
+			c.JSON(500, gin.H{
+				"error": openAIError,
+			})
 		}
 	}()
+	resp, err := client.Stream(req.Messages, req.Model)
+	if err != nil {
+		panic(err)
+		return
+	}
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+
 	w := c.Writer
 	flusher, _ := w.(http.Flusher)
 	timeout := time.Duration(conf.Conf.Timeout) * time.Second
 	ticker := time.NewTimer(timeout)
 
 	defer ticker.Stop()
-	resp, err := client.Stream(req.Messages, req.Model)
-	if err != nil {
-		c.JSON(500, err.Error())
-		return
-	}
 
 	conversationID := "chatcmpl-" + util.RandStringRunes(29)
 
@@ -141,12 +149,19 @@ func Ask(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 	defer func() {
 		if err := recover(); err != nil {
 			util.Logger.Error(err)
-			c.Error(fmt.Errorf("timeout, error code: 2"))
+			openAIError := poe.OpenAIError{
+				Type:    "openai_api_error",
+				Message: "The server had an error while processing your request",
+				Code:    "do_request_failed",
+			}
+			c.JSON(500, gin.H{
+				"error": openAIError,
+			})
 		}
 	}()
 	message, err := client.Ask(req.Messages, req.Model)
 	if err != nil {
-		c.JSON(500, err.Error())
+		panic(err)
 		return
 	}
 	c.JSON(200, poe.CompletionResponse{

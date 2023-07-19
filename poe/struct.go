@@ -1,5 +1,11 @@
 package poe
 
+type OpenAIError struct {
+	Message string `json:"message"`
+	Type    string `json:"type"`
+	Param   string `json:"param"`
+	Code    any    `json:"code"`
+}
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -10,6 +16,7 @@ type CompletionRequest struct {
 	Messages []Message `json:"messages"`
 	Stream   bool      `json:"stream"`
 }
+
 type CompletionResponse struct {
 	ID      string   `json:"id"`
 	Object  string   `json:"object"`
@@ -35,9 +42,9 @@ type CompletionSSEResponse struct {
 	Object  string      `json:"object"`
 }
 type SSEChoice struct {
-	Delta        map[string]string  `json:"delta"`
-	FinishReason *string            `json:"finish_reason"`
-	Index        int                `json:"index"`
+	Delta        map[string]string `json:"delta"`
+	FinishReason *string           `json:"finish_reason"`
+	Index        int               `json:"index"`
 }
 type Delta struct {
 	Role    string `json:"role"`

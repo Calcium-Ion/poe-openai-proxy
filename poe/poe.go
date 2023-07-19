@@ -170,6 +170,9 @@ func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 	util.Logger.Info("Ask using bot", GetBotName(model))
 
 	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, true, time.Duration(conf.Conf.ApiTimeout)*time.Second)
+	if err != nil {
+		return nil, err
+	}
 	return &Message{
 		Role:    "assistant",
 		Content: poe_api.GetFinalResponse(resp),
