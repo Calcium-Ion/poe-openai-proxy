@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lwydyby/poe-api"
+	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,7 +22,7 @@ var clientIx = 0
 var clientLock = &sync.Mutex{}
 
 func Setup() {
-	httpClient = resty.New().SetBaseURL(conf.Conf.Gateway)
+	//httpClient = resty.New().SetBaseURL(conf.Conf.Gateway)
 	for _, token := range conf.Conf.Tokens {
 		client, err := NewClient(token)
 		if err != nil {
@@ -47,15 +49,35 @@ func GetRealModel(model string, token []int) string {
 }
 
 func GetBotName(model string) string {
-	if model == "gpt-4" {
+	if strings.HasPrefix(model, "gpt-4") {
+		if strings.HasPrefix(model, "gpt-4-32k") {
+			return "GPT-4-32k"
+		}
 		return "GPT-4"
 	}
-	return "GPT-4-32k"
+	return "GPT-4"
 }
 
 func NewClient(token string) (*Client, error) {
 	util.Logger.Info("registering client: " + token)
-	c := poe_api.NewClient(token, nil)
+	var uri *url.URL
+	if conf.Conf.Proxy == "" {
+		uri = nil
+	} else {
+		url, err := url.Parse(conf.Conf.Proxy)
+		if err != nil {
+			return nil, err
+		}
+		uri = url
+	}
+	// defer recover
+	defer func() {
+		if r := recover(); r != nil {
+			//fmt.Println("Recovered in f", r)
+			util.Logger.Error(r)
+		}
+	}()
+	c := poe_api.NewClient(token, uri)
 	//resp, err := c.SendMessage("GPT-4", "Test1", false, 10*time.Second)
 	//if err != nil {
 	//	return nil, err
@@ -122,9 +144,9 @@ func (c *Client) Stream(messages []Message, model string) (<-chan map[string]int
 
 	util.Logger.Info("Stream using bot", GetBotName(model))
 
-	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, false, 10*time.Second)
+	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, false, time.Duration(conf.Conf.ApiTimeout)*time.Second)
 
-	return resp, nil
+	return resp, err
 }
 func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 	content := c.getContentToSend(messages)
@@ -147,7 +169,7 @@ func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 
 	util.Logger.Info("Ask using bot", GetBotName(model))
 
-	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, true, 10*time.Second)
+	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, true, time.Duration(conf.Conf.ApiTimeout)*time.Second)
 	return &Message{
 		Role:    "assistant",
 		Content: poe_api.GetFinalResponse(resp),

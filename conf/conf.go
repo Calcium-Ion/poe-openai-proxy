@@ -3,18 +3,19 @@ package conf
 import (
 	"github.com/pelletier/go-toml/v2"
 	"os"
-	"strings"
 )
 
 type ConfigStruct struct {
-	Port          int      `toml:"port"`
-	Tokens        []string `toml:"tokens"`
-	Gateway       string   `toml:"gateway"`
-	Bot           map[string]string   `toml:"bot"`
-	SimulateRoles int      `toml:"simulate-roles"`
-	RateLimit     int      `toml:"rate-limit"`
-	CoolDown      int      `toml:"cool-down"`
-	Timeout       int      `toml:"timeout"`
+	Port   int      `toml:"port"`
+	Tokens []string `toml:"tokens"`
+	//Gateway       string   `toml:"gateway"`
+	Bot           map[string]string `toml:"bot"`
+	SimulateRoles int               `toml:"simulate-roles"`
+	RateLimit     int               `toml:"rate-limit"`
+	CoolDown      int               `toml:"cool-down"`
+	Timeout       int               `toml:"timeout"`
+	ApiTimeout    int               `toml:"api-timeout"`
+	Proxy         string            `toml:"proxy"`
 }
 
 type ModelDef struct {
@@ -25,15 +26,15 @@ type ModelDef struct {
 }
 
 type ModelsResp struct {
-	Object string   `json:"object"`
+	Object string     `json:"object"`
 	Data   []ModelDef `json:"data"`
 }
 
-func (c ConfigStruct) GetGatewayWsURL() string {
-	str := strings.ReplaceAll(c.Gateway, "http://", "ws://")
-	str = strings.ReplaceAll(str, "https://", "wss://")
-	return str
-}
+//func (c ConfigStruct) GetGatewayWsURL() string {
+//	str := strings.ReplaceAll(c.Gateway, "http://", "ws://")
+//	str = strings.ReplaceAll(str, "https://", "wss://")
+//	return str
+//}
 
 var Conf ConfigStruct
 
@@ -49,33 +50,32 @@ func Setup() {
 		panic(err)
 	}
 	if Conf.Port == 0 {
-		Conf.Port = 3700
+		Conf.Port = 3701
 	}
 	if Conf.RateLimit == 0 {
 		Conf.RateLimit = 10
 	}
 	if Conf.Bot == nil {
-		Conf.Bot = map[string]string {
-			"gpt-3.5-turbo":         "chinchilla",
-			"gpt-4":                 "beaver",
-			"gpt-3.5-turbo-0301":    "a2",
-			"gpt-4-32k":             "a2_100k",
-			"gpt-4-0314":            "a2_2",
-			"Sage":                  "capybara",
-			"ChatGPT":               "chinchilla",
-			"GPT-4":                 "beaver",
-			"Claude-instant":        "a2",
-			"Claude-instant-100k":   "a2_100k",
-			"Claude+":               "a2_2",
+		Conf.Bot = map[string]string{
+			"gpt-3.5-turbo":      "ChatGPT",
+			"gpt-3.5-turbo-0301": "ChatGPT",
+			"gpt-4":              "GPT-4",
+			"gpt-4-0314":         "GPT-4",
+			"gpt-4-32k":          "GPT-4-32k",
+			"claude-2-100k":      "Claude-2-100k",
 		}
 	}
+
+	//if Conf.Proxy == "" {
+	//	Conf.Proxy = nil
+	//}
 
 	Models.Object = ""
 
 	for key := range Conf.Bot {
 		Models.Data = append(Models.Data, ModelDef{
-			ID: key,
-			Object: "",
+			ID:      key,
+			Object:  "",
 			Created: 0,
 			OwnedBy: "",
 		})

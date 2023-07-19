@@ -3,7 +3,7 @@ package router
 import (
 	"encoding/json"
 	"fmt"
-	poe_api "github.com/lwydyby/poe-api"
+	"github.com/lwydyby/poe-api"
 	"io"
 	"net/http"
 	"time"
@@ -16,6 +16,7 @@ import (
 )
 
 func Setup(engine *gin.Engine) {
+
 	getModels := func(c *gin.Context) {
 		SetCORS(c)
 		c.JSON(http.StatusOK, conf.Models)
@@ -70,10 +71,17 @@ func Stream(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
+	defer func() {
+		if err := recover(); err != nil {
+			util.Logger.Error(err)
+			c.Error(fmt.Errorf("timeout, error code: 2"))
+		}
+	}()
 	w := c.Writer
 	flusher, _ := w.(http.Flusher)
 	timeout := time.Duration(conf.Conf.Timeout) * time.Second
 	ticker := time.NewTimer(timeout)
+
 	defer ticker.Stop()
 	resp, err := client.Stream(req.Messages, req.Model)
 	if err != nil {
@@ -130,6 +138,12 @@ func Stream(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 
 }
 func Ask(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
+	defer func() {
+		if err := recover(); err != nil {
+			util.Logger.Error(err)
+			c.Error(fmt.Errorf("timeout, error code: 2"))
+		}
+	}()
 	message, err := client.Ask(req.Messages, req.Model)
 	if err != nil {
 		c.JSON(500, err.Error())

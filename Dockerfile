@@ -5,5 +5,5 @@ COPY . .
 
 RUN go build 
 
-EXPOSE 3700
+EXPOSE 3701
 CMD [ "/app/poe-openai-proxy" ]
