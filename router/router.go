@@ -2,7 +2,8 @@ package router
 
 import (
 	"encoding/json"
-
+	"fmt"
+	poe_api "github.com/lwydyby/poe-api"
 	"io"
 	"net/http"
 	"time"
@@ -74,7 +75,7 @@ func Stream(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 	timeout := time.Duration(conf.Conf.Timeout) * time.Second
 	ticker := time.NewTimer(timeout)
 	defer ticker.Stop()
-	channel, err := client.Stream(req.Messages, req.Model)
+	resp, err := client.Stream(req.Messages, req.Model)
 	if err != nil {
 		c.JSON(500, err.Error())
 		return
@@ -120,20 +121,13 @@ func Stream(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 		}
 	}
 	createSSEResponse("", true)
-forLoop:
-	for {
-		select {
-		case <-ticker.C:
-			c.SSEvent("error", "timeout")
-			break forLoop
-		case d := <-channel:
-			ticker.Reset(timeout)
-			createSSEResponse(d, false)
-			if d == "[DONE]" {
-				break forLoop
-			}
-		}
+
+	for m := range poe_api.GetTextStream(resp) {
+		createSSEResponse(m, false)
+		fmt.Print(m)
 	}
+	createSSEResponse("[DONE]", false)
+
 }
 func Ask(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 	message, err := client.Ask(req.Messages, req.Model)

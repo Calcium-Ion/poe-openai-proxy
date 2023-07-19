@@ -3,12 +3,12 @@ package poe
 import (
 	"errors"
 	"fmt"
-	"strings"
+	"github.com/lwydyby/poe-api"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/gorilla/websocket"
 	"github.com/juzeon/poe-openai-proxy/conf"
 	"github.com/juzeon/poe-openai-proxy/util"
 	"github.com/pkoukk/tiktoken-go"
@@ -32,22 +32,38 @@ func Setup() {
 }
 
 type Client struct {
-	Token string
-	Usage []time.Time
-	Lock  bool
+	Token     string
+	Usage     []time.Time
+	Lock      bool
+	PoeClient *poe_api.Client
+}
+
+func GetRealModel(model string, token []int) string {
+	if model == "gpt-4" && len(token) > 2200 {
+		model = "gpt-4-32k"
+		util.Logger.Info("Token len ", len(token), " out of limit, use gpt-4-32k")
+	}
+	return model
+}
+
+func GetBotName(model string) string {
+	if model == "gpt-4" {
+		return "GPT-4"
+	}
+	return "GPT-4-32k"
 }
 
 func NewClient(token string) (*Client, error) {
 	util.Logger.Info("registering client: " + token)
-	resp, err := httpClient.R().SetFormData(map[string]string{
-		"token": token,
-	}).Post("/add_token")
-	if err != nil {
-		return nil, errors.New("registering client error: " + err.Error())
-	}
-	util.Logger.Info("registering client: " + resp.String())
-	return &Client{Token: token, Usage: nil, Lock: false}, nil
+	c := poe_api.NewClient(token, nil)
+	//resp, err := c.SendMessage("GPT-4", "Test1", false, 10*time.Second)
+	//if err != nil {
+	//	return nil, err
+	//}
+	util.Logger.Info("registering client: " + token)
+	return &Client{Token: token, Usage: nil, Lock: false, PoeClient: c}, nil
 }
+
 func (c *Client) getContentToSend(messages []Message) string {
 	leadingMap := map[string]string{
 		"system":    "Instructions",
@@ -63,7 +79,7 @@ func (c *Client) getContentToSend(messages []Message) string {
 	case 1:
 		simulateRoles = true
 	case 2:
-		if len(messages) == 1 && messages[0].Role == "user" ||
+		if len(messages) == 1 && messages[0].Role == "u*-=ser" ||
 			len(messages) == 1 && messages[0].Role == "system" ||
 			len(messages) == 2 && messages[0].Role == "system" && messages[1].Role == "user" {
 			simulateRoles = false
@@ -84,8 +100,8 @@ func (c *Client) getContentToSend(messages []Message) string {
 	util.Logger.Debug("Generated content to send: " + content)
 	return content
 }
-func (c *Client) Stream(messages []Message, model string) (<-chan string, error) {
-	channel := make(chan string, 1024)
+
+func (c *Client) Stream(messages []Message, model string) (<-chan map[string]interface{}, error) {
 	content := c.getContentToSend(messages)
 
 	tkm, err := tiktoken.EncodingForModel(model)
@@ -98,61 +114,17 @@ func (c *Client) Stream(messages []Message, model string) (<-chan string, error)
 
 	util.Logger.Info("Token len ", len(token))
 
-	if model == "gpt-4" && len(token) > 2200 {
-		model = "gpt-4-32k"
-		util.Logger.Info("Token len ", len(token), " out of limit, use gpt-4-32k")
+	if model == "gpt-4" && len(token) > 8000 {
+		return nil, errors.New("Token len " + strconv.Itoa(len(token)) + " out of limit, max token len is 8000")
 	}
 
-	conn, _, err := websocket.DefaultDialer.Dial(conf.Conf.GetGatewayWsURL()+"/stream", nil)
-	if err != nil {
-		return nil, err
-	}
+	model = GetRealModel(model, token)
 
-	bot, ok := conf.Conf.Bot[model]
-	if !ok {
-		bot = "capybara"
-	}
-	util.Logger.Info("Stream using bot", bot)
+	util.Logger.Info("Stream using bot", GetBotName(model))
 
-	err = conn.WriteMessage(websocket.TextMessage, []byte(c.Token))
-	if err != nil {
-		return nil, err
-	}
-	err = conn.WriteMessage(websocket.TextMessage, []byte(bot))
-	if err != nil {
-		return nil, err
-	}
-	err = conn.WriteMessage(websocket.TextMessage, []byte(content))
-	if err != nil {
-		return nil, err
-	}
-	go func(conn *websocket.Conn, channel chan string) {
-		defer close(channel)
-		defer conn.Close()
-		for {
-			_, v, err := conn.ReadMessage()
-			if strings.HasPrefix(string(v), "An exception of type") {
-				util.Logger.Error(string(v))
-				err = errors.New("connect to openai error code 2")
-			}
+	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, false, 10*time.Second)
 
-			if strings.Contains(string(v), "RSV1 set, FIN") {
-				util.Logger.Error(string(v))
-				err = errors.New("connect to openai error code 3")
-			}
-
-			channel <- string(v)
-			if err != nil {
-				if !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-					util.Logger.Error(err)
-					channel <- "\n\n[ERROR] " + err.Error()
-				}
-				channel <- "[DONE]"
-				break
-			}
-		}
-	}(conn, channel)
-	return channel, nil
+	return resp, nil
 }
 func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 	content := c.getContentToSend(messages)
@@ -167,37 +139,18 @@ func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 
 	util.Logger.Info("Token len ", len(token))
 
-	if model == "gpt-4" && len(token) > 2200 {
-		model = "gpt-4-32k"
-		util.Logger.Info("Token len ", len(token), " out of limit, use gpt-4-32k")
+	if model == "gpt-4" && len(token) > 8000 {
+		return nil, errors.New("Token len " + strconv.Itoa(len(token)) + " out of limit, max token len is 8000")
 	}
 
-	bot, ok := conf.Conf.Bot[model]
-	if !ok {
-		bot = "capybara"
-	}
-	util.Logger.Info("Ask using bot", bot)
+	model = GetRealModel(model, token)
 
-	resp, err := httpClient.R().SetFormData(map[string]string{
-		"token":   c.Token,
-		"bot":     bot,
-		"content": content,
-	}).Post("/ask")
-	if err != nil {
-		return nil, err
-	}
-	if strings.HasPrefix(resp.String(), "An exception of type") {
-		util.Logger.Error(resp.String())
-		err = errors.New("connect to openai error code 2")
-	}
+	util.Logger.Info("Ask using bot", GetBotName(model))
 
-	if strings.Contains(resp.String(), "RSV1 set, FIN") {
-		util.Logger.Error(resp.String())
-		err = errors.New("connect to openai error code 3")
-	}
+	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, true, 10*time.Second)
 	return &Message{
 		Role:    "assistant",
-		Content: resp.String(),
+		Content: poe_api.GetFinalResponse(resp),
 		Name:    "",
 	}, nil
 }
