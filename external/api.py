@@ -76,7 +76,8 @@ def ask():
     except Exception as e:
         del client_dict[token]
         client.disconnect_ws()
-        errmsg = f"An exception of type {type(e).__name__} occurred. Arguments: {e.args}"
+        # errmsg = f"An exception of type {type(e).__name__} occurred. Arguments: {e.args}"
+        errmsg = f"An exception of type {type(e).__name__} occurred. Arguments: Fetch to https://api.openai.com timeout."
         print(errmsg)
         return errmsg
 
@@ -94,7 +95,7 @@ def stream(ws):
     except Exception as e:
         del client_dict[token]
         client.disconnect_ws()
-        errmsg = f"An exception of type {type(e).__name__} occurred. Arguments: {e.args}"
+        errmsg = f"An exception of type {type(e).__name__} occurred. Arguments: Fetch to https://api.openai.com timeout."
         print(errmsg)
         ws.send(errmsg)
     ws.close()

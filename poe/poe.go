@@ -133,10 +133,10 @@ func (c *Client) Stream(messages []Message, model string) (<-chan string, error)
 			_, v, err := conn.ReadMessage()
 			if strings.HasPrefix(string(v), "An exception of type") {
 				util.Logger.Error(string(v))
-				err = errors.New("connect to openai error code 2，有可能是你的上下文被openai屏蔽而拒绝回复")
+				err = errors.New("connect to openai error code 2")
 			}
 
-			if strings.Contains(string(v), "ERROR: websocket: RSV1 set, FIN") {
+			if strings.Contains(string(v), "RSV1 set, FIN") {
 				util.Logger.Error(string(v))
 				err = errors.New("connect to openai error code 3")
 			}
@@ -185,6 +185,15 @@ func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 	}).Post("/ask")
 	if err != nil {
 		return nil, err
+	}
+	if strings.HasPrefix(resp.String(), "An exception of type") {
+		util.Logger.Error(resp.String())
+		err = errors.New("connect to openai error code 2")
+	}
+
+	if strings.Contains(resp.String(), "RSV1 set, FIN") {
+		util.Logger.Error(resp.String())
+		err = errors.New("connect to openai error code 3")
 	}
 	return &Message{
 		Role:    "assistant",
