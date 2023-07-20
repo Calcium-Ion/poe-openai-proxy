@@ -3,7 +3,7 @@ package poe
 import (
 	"errors"
 	"fmt"
-	"github.com/lwydyby/poe-api"
+
 	"net/url"
 	"strconv"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/juzeon/poe-openai-proxy/conf"
 	"github.com/juzeon/poe-openai-proxy/util"
+	"github.com/lwydyby/poe-api"
 	"github.com/pkoukk/tiktoken-go"
 )
 
@@ -82,7 +83,7 @@ func NewClient(token string) (*Client, error) {
 	//if err != nil {
 	//	return nil, err
 	//}
-	util.Logger.Info("registering client: " + token)
+	util.Logger.Info("ok")
 	return &Client{Token: token, Usage: nil, Lock: false, PoeClient: c}, nil
 }
 
@@ -124,6 +125,7 @@ func (c *Client) getContentToSend(messages []Message) string {
 }
 
 func (c *Client) Stream(messages []Message, model string) (<-chan map[string]interface{}, error) {
+
 	content := c.getContentToSend(messages)
 
 	tkm, err := tiktoken.EncodingForModel(model)
@@ -144,8 +146,17 @@ func (c *Client) Stream(messages []Message, model string) (<-chan map[string]int
 
 	util.Logger.Info("Stream using bot", GetBotName(model))
 
-	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, false, time.Duration(conf.Conf.ApiTimeout)*time.Second)
+	//defer func() {
+	//	if e := recover(); e != nil {
+	//		//util.Logger.Error(e)
+	//		panic(e)
+	//	}
+	//}()
 
+	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, false, time.Duration(conf.Conf.ApiTimeout)*time.Second)
+	if err != nil {
+		return nil, err
+	}
 	return resp, err
 }
 func (c *Client) Ask(messages []Message, model string) (*Message, error) {
