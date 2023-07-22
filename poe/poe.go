@@ -230,3 +230,37 @@ func GetClient() (*Client, error) {
 	}
 	return nil, errors.New("no available client")
 }
+
+func CheckClient() {
+	defer func() {
+		if r := recover(); r != nil {
+			//fmt.Println("Recovered in f", r)
+			util.Logger.Error(r)
+		}
+	}()
+	util.Logger.Info("开始定时重启")
+	for i := range clients {
+		client := clients[i]
+		needUpdate := false
+		if len(client.Usage) > 0 {
+			lastUsage := client.Usage[len(client.Usage)-1]
+			if time.Since(lastUsage) > 1*time.Minute {
+				needUpdate = true
+			}
+			util.Logger.Info("Client:", client.Token, " last usage:", lastUsage, " need update:", needUpdate)
+		} else {
+			needUpdate = true
+			util.Logger.Info("Client:", client.Token, " never usage", " need update:", needUpdate)
+		}
+
+		if needUpdate {
+			clientNew, err := NewClient(client.Token)
+			if err != nil {
+				util.Logger.Error(err)
+				continue
+			}
+			clientNew.Usage = make([]time.Time, 0)
+			util.Logger.Info("Update client:", client.Token)
+		}
+	}
+}
