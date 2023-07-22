@@ -8,12 +8,20 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juzeon/poe-openai-proxy/conf"
-
 	"github.com/gin-gonic/gin"
+	"github.com/juzeon/poe-openai-proxy/conf"
 	"github.com/juzeon/poe-openai-proxy/poe"
 	"github.com/juzeon/poe-openai-proxy/util"
 )
+
+//func sendMessage(bot *tgbotapi.BotAPI, chatID int64, text string) {
+//	msg := tgbotapi.NewMessage(chatID, text)
+//
+//	_, err := bot.Send(msg)
+//	if err != nil {
+//		log.Panic(err)
+//	}
+//}
 
 func Setup(engine *gin.Engine) {
 
@@ -70,12 +78,13 @@ func Setup(engine *gin.Engine) {
 func Stream(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 	defer func() {
 		if err := recover(); err != nil {
-			util.Logger.Error(err)
+			util.Logger.Error(err, client.Token)
 			openAIError := poe.OpenAIError{
 				Type:    "openai_api_error",
 				Message: "The server had an error while processing your request",
 				Code:    "do_request_failed",
 			}
+
 			c.JSON(500, gin.H{
 				"error": openAIError,
 			})
