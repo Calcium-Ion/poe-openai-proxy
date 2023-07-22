@@ -3,6 +3,8 @@ package poe
 import (
 	"errors"
 	"fmt"
+	"github.com/go-resty/resty/v2"
+	"github.com/pkoukk/tiktoken-go"
 
 	"net/url"
 	"strconv"
@@ -10,11 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/juzeon/poe-openai-proxy/conf"
 	"github.com/juzeon/poe-openai-proxy/util"
 	"github.com/lwydyby/poe-api"
-	"github.com/pkoukk/tiktoken-go"
 )
 
 var httpClient *resty.Client
@@ -244,7 +244,7 @@ func CheckClient() {
 		needUpdate := false
 		if len(client.Usage) > 0 {
 			lastUsage := client.Usage[len(client.Usage)-1]
-			if time.Since(lastUsage) > 1*time.Minute {
+			if time.Since(lastUsage) > time.Duration(conf.Conf.AutoReload)*time.Minute {
 				needUpdate = true
 			}
 			util.Logger.Info("Client:", client.Token, " last usage:", lastUsage, " need update:", needUpdate)

@@ -13,6 +13,7 @@ type ConfigStruct struct {
 	SimulateRoles int               `toml:"simulate-roles"`
 	RateLimit     int               `toml:"rate-limit"`
 	CoolDown      int               `toml:"cool-down"`
+	AutoReload    int               `toml:"auto-reload"`
 	Timeout       int               `toml:"timeout"`
 	ApiTimeout    int               `toml:"api-timeout"`
 	Proxy         string            `toml:"proxy"`
