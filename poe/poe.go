@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkoukk/tiktoken-go"
-
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Calcium-Ion/poe-api"
 	"github.com/juzeon/poe-openai-proxy/conf"
 	"github.com/juzeon/poe-openai-proxy/util"
-	"github.com/lwydyby/poe-api"
 )
 
 var httpClient *resty.Client
@@ -56,7 +55,10 @@ func GetBotName(model string) string {
 		}
 		return "GPT-4"
 	}
-	return "GPT-4"
+	if strings.HasPrefix(model, "claude") {
+		return "Claude-2-100k"
+	}
+	return "ChatGPT"
 }
 
 func NewClient(token string) (*Client, error) {
@@ -65,33 +67,32 @@ func NewClient(token string) (*Client, error) {
 	if conf.Conf.Proxy == "" {
 		uri = nil
 	} else {
-		url, err := url.Parse(conf.Conf.Proxy)
+		url_, err := url.Parse(conf.Conf.Proxy)
 		if err != nil {
 			return nil, err
 		}
-		uri = url
+		uri = url_
 	}
 	// defer recover
-	defer func() {
-		if r := recover(); r != nil {
-			//fmt.Println("Recovered in f", r)
-			util.Logger.Error(r)
-		}
-	}()
-	c := poe_api.NewClient(token, uri)
-	//resp, err := c.SendMessage("GPT-4", "Test1", false, 10*time.Second)
-	//if err != nil {
-	//	return nil, err
-	//}
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		//fmt.Println("Recovered in f", r)
+	//		util.Logger.Error(r)
+	//	}
+	//}()
+	c, err := poe_api.NewClient(token, uri)
+	if err != nil {
+		return nil, err
+	}
 	util.Logger.Info("ok")
 	return &Client{Token: token, Usage: nil, Lock: false, PoeClient: c}, nil
 }
 
 func (c *Client) getContentToSend(messages []Message) string {
 	leadingMap := map[string]string{
-		"system":    "Instructions",
-		"user":      "User",
-		"assistant": "Assistant",
+		"system":    "YouShouldKnow",
+		"user":      "Me",
+		"assistant": "You",
 		"function":  "Information",
 	}
 	content := ""
@@ -128,7 +129,7 @@ func (c *Client) Stream(messages []Message, model string) (<-chan map[string]int
 
 	content := c.getContentToSend(messages)
 
-	tkm, err := tiktoken.EncodingForModel(model)
+	tkm, err := tiktoken.EncodingForModel("gpt-4")
 	if err != nil {
 		err = fmt.Errorf("getEncoding: %v", err)
 		return nil, err
@@ -162,7 +163,7 @@ func (c *Client) Stream(messages []Message, model string) (<-chan map[string]int
 func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 	content := c.getContentToSend(messages)
 
-	tkm, err := tiktoken.EncodingForModel(model)
+	tkm, err := tiktoken.EncodingForModel("gpt-4")
 	if err != nil {
 		err = fmt.Errorf("getEncoding: %v", err)
 		return nil, err
@@ -238,29 +239,25 @@ func CheckClient() {
 			util.Logger.Error(r)
 		}
 	}()
-	util.Logger.Info("开始定时重启")
-	for i := range clients {
-		client := clients[i]
-		needUpdate := false
+	util.Logger.Info("开始定时重启:", time.Now().Format("2006-01-02 15:04:05"))
+	for _, client := range clients {
+		//message, err := c.Ask([]Message{{Role: "system", Content: "ping"}}, "gpt-4")
+		//if err != nil {
+		//	return
+		//}
+		//util.Logger.Info("client", i, "ping:", message.Content)
+		needUpdate := true
 		if len(client.Usage) > 0 {
 			lastUsage := client.Usage[len(client.Usage)-1]
-			if time.Since(lastUsage) > time.Duration(conf.Conf.AutoReload)*time.Minute {
-				needUpdate = true
+			if time.Since(lastUsage) < time.Duration(conf.Conf.AutoReload)*time.Minute {
+				needUpdate = false
 			}
-			util.Logger.Info("Client:", client.Token, " last usage:", lastUsage, " need update:", needUpdate)
-		} else {
-			needUpdate = true
-			util.Logger.Info("Client:", client.Token, " never usage", " need update:", needUpdate)
 		}
 
 		if needUpdate {
-			clientNew, err := NewClient(client.Token)
-			if err != nil {
-				util.Logger.Error(err)
-				continue
-			}
-			clientNew.Usage = make([]time.Time, 0)
-			util.Logger.Info("Update client:", client.Token)
+			util.Logger.Info("Client:", client.Token, " need update:", needUpdate)
+			client.Ask([]Message{{Role: "system", Content: "ping"}}, "gpt-3.5-turbo")
+			//util.Logger.Info("Update client success:", client.Token)
 		}
 	}
 }

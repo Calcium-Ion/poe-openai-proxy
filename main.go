@@ -16,7 +16,7 @@ func main() {
 	engine := gin.Default()
 	router.Setup(engine)
 	c := cron.New()
-	_, err := c.AddFunc("@every 1m", poe.CheckClient)
+	_, err := c.AddFunc("@every 30m", poe.CheckClient)
 	if err != nil {
 		panic(err)
 	}
