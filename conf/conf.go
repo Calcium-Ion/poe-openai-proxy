@@ -6,9 +6,8 @@ import (
 )
 
 type ConfigStruct struct {
-	Port   int      `toml:"port"`
-	Tokens []string `toml:"tokens"`
-	//Gateway       string   `toml:"gateway"`
+	Port          int               `toml:"port"`
+	Tokens        map[string]string `toml:"tokens"`
 	Bot           map[string]string `toml:"bot"`
 	SimulateRoles int               `toml:"simulate-roles"`
 	RateLimit     int               `toml:"rate-limit"`
@@ -31,12 +30,6 @@ type ModelsResp struct {
 	Data   []ModelDef `json:"data"`
 }
 
-//func (c ConfigStruct) GetGatewayWsURL() string {
-//	str := strings.ReplaceAll(c.Gateway, "http://", "ws://")
-//	str = strings.ReplaceAll(str, "https://", "wss://")
-//	return str
-//}
-
 var Conf ConfigStruct
 
 var Models ModelsResp
@@ -46,6 +39,7 @@ func Setup() {
 	if err != nil {
 		panic(err)
 	}
+	//log.Printf("%s", v)
 	err = toml.Unmarshal(v, &Conf)
 	if err != nil {
 		panic(err)
@@ -66,10 +60,6 @@ func Setup() {
 			"claude-2-100k":      "Claude-2-100k",
 		}
 	}
-
-	//if Conf.Proxy == "" {
-	//	Conf.Proxy = nil
-	//}
 
 	Models.Object = ""
 

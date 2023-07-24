@@ -3,6 +3,7 @@ package poe
 import (
 	"errors"
 	"fmt"
+	poe_api "github.com/Calcium-Ion/poe-api-go"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkoukk/tiktoken-go"
 	"net/url"
@@ -11,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Calcium-Ion/poe-api"
 	"github.com/juzeon/poe-openai-proxy/conf"
 	"github.com/juzeon/poe-openai-proxy/util"
 )
@@ -23,8 +23,8 @@ var clientLock = &sync.Mutex{}
 
 func Setup() {
 	//httpClient = resty.New().SetBaseURL(conf.Conf.Gateway)
-	for _, token := range conf.Conf.Tokens {
-		client, err := NewClient(token)
+	for token, formKey := range conf.Conf.Tokens {
+		client, err := NewClient(token, formKey)
 		if err != nil {
 			util.Logger.Error(err)
 			continue
@@ -61,7 +61,7 @@ func GetBotName(model string) string {
 	return "ChatGPT"
 }
 
-func NewClient(token string) (*Client, error) {
+func NewClient(token string, formKey string) (*Client, error) {
 	util.Logger.Info("registering client: " + token)
 	var uri *url.URL
 	if conf.Conf.Proxy == "" {
@@ -80,7 +80,7 @@ func NewClient(token string) (*Client, error) {
 	//		util.Logger.Error(r)
 	//	}
 	//}()
-	c, err := poe_api.NewClient(token, uri)
+	c, err := poe_api.NewClient(token, formKey, uri)
 	if err != nil {
 		return nil, err
 	}
@@ -90,10 +90,10 @@ func NewClient(token string) (*Client, error) {
 
 func (c *Client) getContentToSend(messages []Message) string {
 	leadingMap := map[string]string{
-		"system":    "YouShouldKnow",
-		"user":      "Me",
-		"assistant": "You",
-		"function":  "Information",
+		"system":   "YouShouldKnow",
+		"user":     "Me",
+		"":         "You",
+		"function": "Information",
 	}
 	content := ""
 	var simulateRoles bool
@@ -154,7 +154,7 @@ func (c *Client) Stream(messages []Message, model string) (<-chan map[string]int
 	//	}
 	//}()
 
-	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, false, time.Duration(conf.Conf.ApiTimeout)*time.Second)
+	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, true, time.Duration(conf.Conf.ApiTimeout)*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 
 	util.Logger.Info("Ask using bot", GetBotName(model))
 
-	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, true, time.Duration(conf.Conf.ApiTimeout)*time.Second)
+	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, false, time.Duration(conf.Conf.ApiTimeout)*time.Second)
 	if err != nil {
 		return nil, err
 	}

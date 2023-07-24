@@ -2,9 +2,9 @@ package router
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/Calcium-Ion/poe-api"
+	poe_api "github.com/Calcium-Ion/poe-api-go"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -147,10 +147,13 @@ func Stream(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 	}
 	createSSEResponse("", true)
 
+	respCount := 0
 	for m := range poe_api.GetTextStream(resp) {
 		createSSEResponse(m, false)
-		fmt.Print(m)
+		respCount++
+		log.Printf("stream: %s len %d\n", m, len(m))
 	}
+	util.Logger.Info("stream count: ", respCount)
 	createSSEResponse("[DONE]", false)
 
 }

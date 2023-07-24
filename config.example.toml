@@ -1,9 +1,6 @@
 # The port number for the proxy service. The proxied OpenAI API endpoint will be: http://localhost:3700/v1/chat/completions
 port = 3701
 
-# A list of poe tokens. You can get them from the cookies on poe.com, they look like this: p-b=fdasac5a1dfa6%3D%3D
-tokens = ["fdasac5a1dfa6%3D%3D"]
-
 # The proxy that will be used to connect to poe.com. Leave it blank if you do not use a proxy
 proxy = ""
 
@@ -29,9 +26,13 @@ auto-reload = 10
 # This timeout will now reset every time a chunk is received
 # so there's no need for a very large value to compensate for a very long reply
 timeout = 15
+
 # Timeout for poe-api, usually it should be smaller than timeout
 api-timeout = 12
 
+# The token and formkey map
+[tokens]
+	"you p-b" = "you formkey"
 
 # The bot name map to use from poe.
 [bot]
