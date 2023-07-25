@@ -2,7 +2,9 @@ package router
 
 import (
 	"encoding/json"
+	"fmt"
 	poe_api "github.com/Calcium-Ion/poe-api-go"
+	"github.com/pkoukk/tiktoken-go"
 	"io"
 	"log"
 	"net/http"
@@ -153,6 +155,20 @@ func Stream(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 		respCount++
 		log.Printf("stream: %s len %d\n", m, len(m))
 	}
+	if respCount == 0 {
+		//createSSEResponse("你的提问被屏蔽，解决办法：不要在问题中进行对话（角色）模拟", false)
+		c.Writer.Header().Set("Content-Type", "application/json")
+		openAIError := poe.OpenAIError{
+			Type:    "openai_api_error",
+			Message: "你的提问被屏蔽，解决办法：不要在问题中进行对话（角色）模拟",
+			Code:    "do_request_failed",
+		}
+
+		c.JSON(500, gin.H{
+			"error": openAIError,
+		})
+		return
+	}
 	util.Logger.Info("stream count: ", respCount)
 	createSSEResponse("[DONE]", false)
 
@@ -171,10 +187,17 @@ func Ask(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 			})
 		}
 	}()
-	message, err := client.Ask(req.Messages, req.Model)
+	message, promptTokens, err := client.Ask(req.Messages, req.Model)
 	if err != nil {
 		panic(err)
 		return
+	}
+	tkm, err := tiktoken.EncodingForModel("gpt-4")
+	var token = make([]int, 0)
+	if err != nil {
+		err = fmt.Errorf("getEncoding: %v", err)
+	} else {
+		token = tkm.Encode(message.Content, nil, nil)
 	}
 	c.JSON(200, poe.CompletionResponse{
 		ID:      "chatcmpl-" + util.RandStringRunes(29),
@@ -186,9 +209,9 @@ func Ask(c *gin.Context, req poe.CompletionRequest, client *poe.Client) {
 			FinishReason: "stop",
 		}},
 		Usage: poe.Usage{
-			PromptTokens:     0,
-			CompletionTokens: 0,
-			TotalTokens:      0,
+			PromptTokens:     promptTokens,
+			CompletionTokens: len(token),
+			TotalTokens:      promptTokens + len(token),
 		},
 	})
 }

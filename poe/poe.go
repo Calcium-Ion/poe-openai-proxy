@@ -90,20 +90,28 @@ func NewClient(token string, formKey string) (*Client, error) {
 
 func (c *Client) getContentToSend(messages []Message) string {
 	leadingMap := map[string]string{
-		"system":   "YouShouldKnow",
-		"user":     "Me",
-		"":         "You",
-		"function": "Information",
+		"system":    "YouShouldKnow",
+		"user":      "Me",
+		"assistant": "You",
+		"function":  "Information",
 	}
 	content := ""
 	var simulateRoles bool
+
+	//if strings.Contains(messages[0].Content, "AI:") && strings.Contains(messages[0].Content, "Human:") {
+	//	messages[0].Content = strings.ReplaceAll(messages[0].Content, "AI:", "")
+	//	messages[0].Content = strings.ReplaceAll(messages[0].Content, "Human:", "")
+	//	messages[0].Role = "user"
+	//	simulateRoles = true
+	//}
+
 	switch conf.Conf.SimulateRoles {
 	case 0:
 		simulateRoles = false
 	case 1:
 		simulateRoles = true
 	case 2:
-		if len(messages) == 1 && messages[0].Role == "u*-=ser" ||
+		if len(messages) == 1 && messages[0].Role == "user" ||
 			len(messages) == 1 && messages[0].Role == "system" ||
 			len(messages) == 2 && messages[0].Role == "system" && messages[1].Role == "user" {
 			simulateRoles = false
@@ -119,8 +127,9 @@ func (c *Client) getContentToSend(messages []Message) string {
 		}
 	}
 	if simulateRoles {
-		content += "||>Assistant:\n"
+		content += "||>You:\n"
 	}
+
 	util.Logger.Debug("Generated content to send: " + content)
 	return content
 }
@@ -160,13 +169,13 @@ func (c *Client) Stream(messages []Message, model string) (<-chan map[string]int
 	}
 	return resp, err
 }
-func (c *Client) Ask(messages []Message, model string) (*Message, error) {
+func (c *Client) Ask(messages []Message, model string) (*Message, int, error) {
 	content := c.getContentToSend(messages)
 
 	tkm, err := tiktoken.EncodingForModel("gpt-4")
 	if err != nil {
 		err = fmt.Errorf("getEncoding: %v", err)
-		return nil, err
+		return nil, 0, err
 	}
 
 	token := tkm.Encode(content, nil, nil)
@@ -174,7 +183,7 @@ func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 	util.Logger.Info("Token len ", len(token))
 
 	if model == "gpt-4" && len(token) > 8000 {
-		return nil, errors.New("Token len " + strconv.Itoa(len(token)) + " out of limit, max token len is 8000")
+		return nil, 0, errors.New("Token len " + strconv.Itoa(len(token)) + " out of limit, max token len is 8000")
 	}
 
 	model = GetRealModel(model, token)
@@ -183,13 +192,13 @@ func (c *Client) Ask(messages []Message, model string) (*Message, error) {
 
 	resp, err := c.PoeClient.SendMessage(GetBotName(model), content, false, time.Duration(conf.Conf.ApiTimeout)*time.Second)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	return &Message{
 		Role:    "assistant",
 		Content: poe_api.GetFinalResponse(resp),
 		Name:    "",
-	}, nil
+	}, len(token), nil
 }
 func (c *Client) Release() {
 	clientLock.Lock()
@@ -256,7 +265,11 @@ func CheckClient() {
 
 		if needUpdate {
 			util.Logger.Info("Client:", client.Token, " need update:", needUpdate)
-			client.Ask([]Message{{Role: "system", Content: "ping"}}, "gpt-3.5-turbo")
+			ask, _, err := client.Ask([]Message{{Role: "system", Content: "ping"}}, "gpt-3.5-turbo")
+			if err != nil {
+				continue
+			}
+			util.Logger.Info("Client response:", ask.Content)
 			//util.Logger.Info("Update client success:", client.Token)
 		}
 	}
